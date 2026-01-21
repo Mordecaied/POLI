@@ -8,9 +8,7 @@ const DEFAULT_STORAGE_KEY = 'poli_qa_state';
 /**
  * Load QA state from localStorage
  */
-export function loadQAState<TScreen extends string = string>(
-  storageKey: string = DEFAULT_STORAGE_KEY
-): QAState<TScreen> | null {
+export function loadQAState(storageKey: string = DEFAULT_STORAGE_KEY): QAState | null {
   try {
     const stored = localStorage.getItem(storageKey);
     if (!stored) return null;
@@ -25,7 +23,7 @@ export function loadQAState<TScreen extends string = string>(
       Array.isArray(parsed.checklists) &&
       Array.isArray(parsed.bugs)
     ) {
-      return parsed as QAState<TScreen>;
+      return parsed as QAState;
     }
 
     console.warn('[POLI] Invalid state structure, returning null');
@@ -39,10 +37,7 @@ export function loadQAState<TScreen extends string = string>(
 /**
  * Save QA state to localStorage
  */
-export function saveQAState<TScreen extends string = string>(
-  state: QAState<TScreen>,
-  storageKey: string = DEFAULT_STORAGE_KEY
-): void {
+export function saveQAState(state: QAState, storageKey: string = DEFAULT_STORAGE_KEY): void {
   try {
     const serialized = JSON.stringify(state);
     localStorage.setItem(storageKey, serialized);
@@ -71,10 +66,7 @@ export function clearQAState(storageKey: string = DEFAULT_STORAGE_KEY): void {
 /**
  * Clear old test sessions to free up space (keep last 10 sessions)
  */
-function clearOldSessions<TScreen extends string = string>(
-  state: QAState<TScreen>,
-  storageKey: string
-): void {
+function clearOldSessions(state: QAState, storageKey: string): void {
   try {
     const sortedSessions = [...state.testSessions].sort(
       (a, b) => b.startedAt - a.startedAt
@@ -82,7 +74,7 @@ function clearOldSessions<TScreen extends string = string>(
 
     const recentSessions = sortedSessions.slice(0, 10);
 
-    const cleanedState: QAState<TScreen> = {
+    const cleanedState: QAState = {
       ...state,
       testSessions: recentSessions,
     };
@@ -99,10 +91,7 @@ function clearOldSessions<TScreen extends string = string>(
 /**
  * Export QA state as downloadable JSON file
  */
-export function exportQAState<TScreen extends string = string>(
-  state: QAState<TScreen>,
-  filename?: string
-): void {
+export function exportQAState(state: QAState, filename?: string): void {
   try {
     const serialized = JSON.stringify(state, null, 2);
     const blob = new Blob([serialized], { type: 'application/json' });
@@ -124,9 +113,7 @@ export function exportQAState<TScreen extends string = string>(
 /**
  * Import QA state from JSON file
  */
-export function importQAState<TScreen extends string = string>(
-  file: File
-): Promise<QAState<TScreen>> {
+export function importQAState(file: File): Promise<QAState> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -143,7 +130,7 @@ export function importQAState<TScreen extends string = string>(
           Array.isArray(parsed.checklists) &&
           Array.isArray(parsed.bugs)
         ) {
-          resolve(parsed as QAState<TScreen>);
+          resolve(parsed as QAState);
         } else {
           reject(new Error('Invalid QA state structure'));
         }

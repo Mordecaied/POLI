@@ -12,10 +12,10 @@ import {
 import { loadQAState, saveQAState } from '../services/qaStorage';
 import { useQAShortcut } from '../hooks/useQAShortcut';
 
-interface QAContextValue<TScreen extends string = string> {
+interface QAContextValue {
   // State
-  state: QAState<TScreen>;
-  currentScreen: TScreen | null;
+  state: QAState;
+  currentScreen: string | null;
 
   // Panel control
   isOpen: boolean;
@@ -24,15 +24,15 @@ interface QAContextValue<TScreen extends string = string> {
   closePanel: () => void;
 
   // Screen detection
-  setCurrentScreen: (screen: TScreen | null) => void;
+  setCurrentScreen: (screen: string | null) => void;
 
   // Test management
   updateTestStatus: (testId: string, status: TestItem['status'], notes?: string) => void;
-  addTestItem: (item: TestItem<TScreen>) => void;
+  addTestItem: (item: TestItem) => void;
   removeTestItem: (testId: string) => void;
 
   // Bug reporting
-  reportBug: (bug: Omit<BugReport<TScreen>, 'id' | 'reportedAt'>) => void;
+  reportBug: (bug: Omit<BugReport, 'id' | 'reportedAt'>) => void;
   updateBugStatus: (bugId: string, status: BugReport['status']) => void;
   deleteBug: (bugId: string) => void;
 
@@ -49,43 +49,40 @@ interface QAContextValue<TScreen extends string = string> {
   exportState: () => void;
 }
 
-const QAContext = createContext<QAContextValue<string> | null>(null);
+const QAContext = createContext<QAContextValue | null>(null);
 
-interface QAProviderProps<TScreen extends string = string> {
+interface QAProviderProps {
   children: React.ReactNode;
-  defaultChecklists?: TestChecklist<TScreen>[];
+  defaultChecklists?: TestChecklist[];
   storageKey?: string;
   enableScreenDetection?: boolean;
   testerName?: string;
 }
 
-function createDefaultState<TScreen extends string = string>(): QAState<TScreen> {
-  return {
-    isOpen: false,
-    currentSession: null,
-    testSessions: [],
-    checklists: [],
-    bugs: [],
-  };
-}
+const DEFAULT_STATE: QAState = {
+  isOpen: false,
+  currentSession: null,
+  testSessions: [],
+  checklists: [],
+  bugs: [],
+};
 
-export function QAProvider<TScreen extends string = string>({
+export function QAProvider({
   children,
   defaultChecklists = [],
   storageKey = 'poli_qa_state',
   enableScreenDetection = true,
-  testerName = 'Tester',
-}: QAProviderProps<TScreen>) {
+}: QAProviderProps) {
   // Load initial state from localStorage or use default
-  const [state, setState] = useState<QAState<TScreen>>(() => {
-    const loaded = loadQAState<TScreen>(storageKey);
+  const [state, setState] = useState<QAState>(() => {
+    const loaded = loadQAState(storageKey);
     if (loaded) {
       return { ...loaded, isOpen: false }; // Always start closed
     }
-    return { ...createDefaultState<TScreen>(), checklists: defaultChecklists };
+    return { ...DEFAULT_STATE, checklists: defaultChecklists };
   });
 
-  const [currentScreen, setCurrentScreen] = useState<TScreen | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<string | null>(null);
 
   // Auto-save to localStorage whenever state changes
   useEffect(() => {
@@ -144,7 +141,7 @@ export function QAProvider<TScreen extends string = string>({
     []
   );
 
-  const addTestItem = useCallback((item: TestItem<TScreen>) => {
+  const addTestItem = useCallback((item: TestItem) => {
     setState((prev) => {
       const existingChecklist = prev.checklists.find((c) => c.screen === item.screen);
 
@@ -178,8 +175,8 @@ export function QAProvider<TScreen extends string = string>({
 
   // Bug reporting
   const reportBug = useCallback(
-    (bug: Omit<BugReport<TScreen>, 'id' | 'reportedAt'>) => {
-      const newBug: BugReport<TScreen> = {
+    (bug: Omit<BugReport, 'id' | 'reportedAt'>) => {
+      const newBug: BugReport = {
         ...bug,
         id: `bug_${Date.now()}`,
         reportedAt: Date.now(),
@@ -372,7 +369,7 @@ export function QAProvider<TScreen extends string = string>({
 
   // State management
   const resetState = useCallback(() => {
-    setState({ ...createDefaultState<TScreen>(), checklists: defaultChecklists });
+    setState({ ...DEFAULT_STATE, checklists: defaultChecklists });
   }, [defaultChecklists]);
 
   const exportState = useCallback(() => {
@@ -390,7 +387,7 @@ export function QAProvider<TScreen extends string = string>({
     URL.revokeObjectURL(url);
   }, [generateMarkdownReport]);
 
-  const value: QAContextValue<TScreen> = {
+  const value: QAContextValue = {
     state,
     currentScreen: enableScreenDetection ? currentScreen : null,
     isOpen: state.isOpen,
@@ -412,16 +409,16 @@ export function QAProvider<TScreen extends string = string>({
     exportState,
   };
 
-  return <QAContext.Provider value={value as QAContextValue<string>}>{children}</QAContext.Provider>;
+  return <QAContext.Provider value={value}>{children}</QAContext.Provider>;
 }
 
 /**
  * Hook to access QA context
  */
-export function useQA<TScreen extends string = string>(): QAContextValue<TScreen> {
+export function useQA(): QAContextValue {
   const context = useContext(QAContext);
   if (!context) {
     throw new Error('useQA must be used within QAProvider');
   }
-  return context as QAContextValue<TScreen>;
+  return context;
 }

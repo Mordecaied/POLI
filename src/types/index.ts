@@ -1,13 +1,12 @@
 // POLI QA System Type Definitions
 
-// Generic screen type - users define their own screens
 export type TestStatus = 'not_started' | 'passed' | 'failed' | 'skipped';
 export type BugSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type BugStatus = 'open' | 'in_progress' | 'fixed' | 'wont_fix';
 
-export interface TestItem<TScreen extends string = string> {
+export interface TestItem {
   id: string;
-  screen: TScreen;
+  screen: string;
   category: 'UI' | 'Functionality' | 'Performance' | 'Integration';
   description: string;
   status: TestStatus;
@@ -15,13 +14,13 @@ export interface TestItem<TScreen extends string = string> {
   testedAt?: number;
 }
 
-export interface BugReport<TScreen extends string = string> {
+export interface BugReport {
   id: string;
   title: string;
   description: string;
   severity: BugSeverity;
   status: BugStatus;
-  screen: TScreen;
+  screen: string;
   stepsToReproduce: string[];
   expectedBehavior: string;
   actualBehavior: string;
@@ -48,18 +47,15 @@ export interface TestSession {
   tester: string;
 }
 
-export interface TestChecklist<TScreen extends string = string> {
-  screen: TScreen;
-  items: TestItem<TScreen>[];
+export interface TestChecklist {
+  screen: string;
+  items: TestItem[];
 }
 
-export interface QAState<TScreen extends string = string> {
+export interface QAState {
   isOpen: boolean;
   currentSession: TestSession | null;
   testSessions: TestSession[];
-  checklists: TestChecklist<TScreen>[];
-  bugs: BugReport<TScreen>[];
+  checklists: TestChecklist[];
+  bugs: BugReport[];
 }
-
-// Helper type to extract screen names from checklists
-export type ExtractScreens<T extends TestChecklist<string>[]> = T[number]['screen'];
