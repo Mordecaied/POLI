@@ -1,0 +1,53 @@
+{
+  "name": "poli-qa",
+  "version": "1.0.0",
+  "description": "POLI - Portable Overlay for Live Inspection. A QA testing overlay for React apps with CLI auto-detection.",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "poli-qa": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/cli/index.ts --format cjs,esm --dts --clean",
+    "build:cli": "tsup src/cli/index.ts --format cjs --outDir dist/cli",
+    "dev": "tsup src/index.ts src/cli/index.ts --format cjs,esm --dts --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "qa",
+    "testing",
+    "react",
+    "overlay",
+    "debug",
+    "inspection",
+    "cli",
+    "test-automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mordecaied/POLI"
+  },
+  "homepage": "https://github.com/Mordecaied/POLI#readme",
+  "bugs": {
+    "url": "https://github.com/Mordecaied/POLI/issues"
+  }
+}
