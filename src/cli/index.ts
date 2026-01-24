@@ -22,13 +22,16 @@ interface DetectedScreen {
 
 // Common patterns that indicate a screen/page component
 const SCREEN_PATTERNS = [
-  /Page\.tsx$/,
-  /Screen\.tsx$/,
-  /View\.tsx$/,
-  /pages\/.*\.tsx$/,
-  /screens\/.*\.tsx$/,
-  /views\/.*\.tsx$/,
-  /routes\/.*\.tsx$/,
+  /Page\.(tsx|jsx)$/,
+  /Screen\.(tsx|jsx)$/,
+  /View\.(tsx|jsx)$/,
+  /pages\/.*\.(tsx|jsx)$/,
+  /screens\/.*\.(tsx|jsx)$/,
+  /views\/.*\.(tsx|jsx)$/,
+  /routes\/.*\.(tsx|jsx)$/,
+  /components\/.*Page\.(tsx|jsx)$/,
+  /components\/.*Calculator\.(tsx|jsx)$/,
+  /components\/.*Calendar\.(tsx|jsx)$/,
 ];
 
 // Patterns to exclude
@@ -37,7 +40,7 @@ const EXCLUDE_PATTERNS = [
   /\.test\./,
   /\.spec\./,
   /\.stories\./,
-  /index\.tsx$/,
+  /index\.(tsx|jsx)$/,
   /__tests__/,
 ];
 
@@ -80,7 +83,7 @@ function getAllFiles(dir: string, files: string[] = []): string[] {
 
       if (stat.isDirectory()) {
         getAllFiles(fullPath, files);
-      } else if (stat.isFile() && fullPath.endsWith('.tsx')) {
+      } else if (stat.isFile() && (fullPath.endsWith('.tsx') || fullPath.endsWith('.jsx'))) {
         files.push(fullPath);
       }
     }
@@ -92,11 +95,12 @@ function getAllFiles(dir: string, files: string[] = []): string[] {
 }
 
 function extractComponentName(filePath: string): string {
-  const basename = path.basename(filePath, '.tsx');
+  const ext = path.extname(filePath);
+  const basename = path.basename(filePath, ext);
   // Convert to UPPER_SNAKE_CASE for screen name
   return basename
     .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/Page$|Screen$|View$/i, '')
+    .replace(/Page$|Screen$|View$|Calculator$|Calendar$/i, '')
     .toUpperCase()
     .replace(/-/g, '_');
 }
