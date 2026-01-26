@@ -97,10 +97,11 @@ function getAllFiles(dir: string, files: string[] = []): string[] {
 function extractComponentName(filePath: string): string {
   const ext = path.extname(filePath);
   const basename = path.basename(filePath, ext);
-  // Convert to UPPER_SNAKE_CASE for screen name
-  return basename
+  // Remove common suffixes FIRST, before converting to snake_case
+  const nameWithoutSuffix = basename.replace(/Page$|Screen$|View$|Calculator$|Calendar$/i, '');
+  // Then convert to UPPER_SNAKE_CASE for screen name
+  return nameWithoutSuffix
     .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/Page$|Screen$|View$|Calculator$|Calendar$/i, '')
     .toUpperCase()
     .replace(/-/g, '_');
 }
@@ -156,9 +157,11 @@ function detectScreens(projectRoot: string): DetectedScreen[] {
 
   for (const filePath of allFiles) {
     const relativePath = path.relative(projectRoot, filePath);
+    // Normalize path separators to forward slashes for regex matching
+    const normalizedPath = relativePath.replace(/\\/g, '/');
 
     // Check if file matches screen patterns
-    const isScreen = SCREEN_PATTERNS.some(p => p.test(relativePath));
+    const isScreen = SCREEN_PATTERNS.some(p => p.test(normalizedPath));
 
     if (isScreen) {
       const content = fs.readFileSync(filePath, 'utf-8');

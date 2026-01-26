@@ -13,6 +13,8 @@ export function QAPanel() {
     state,
     currentScreen,
     updateTestStatus,
+    addTestItem,
+    removeTestItem,
     reportBug,
     deleteBug,
     startTestSession,
@@ -24,6 +26,9 @@ export function QAPanel() {
   const [activeTab, setActiveTab] = useState<'tests' | 'bugs' | 'session'>('session');
   const [showBugForm, setShowBugForm] = useState(false);
   const [showSessionForm, setShowSessionForm] = useState(false);
+  const [showAddTestForm, setShowAddTestForm] = useState(false);
+  const [newTestDescription, setNewTestDescription] = useState('');
+  const [newTestCategory, setNewTestCategory] = useState<'UI' | 'Functionality'>('Functionality');
   const [sessionName, setSessionName] = useState('');
   const [testerName, setTesterName] = useState('Tester');
   const [position, setPosition] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 384 : 0, y: 0 });
@@ -174,6 +179,36 @@ export function QAPanel() {
     setTesterName('Tester');
     setShowSessionForm(false);
     setActiveTab('tests');
+  };
+
+  // Add new test to current screen
+  const handleAddTest = () => {
+    if (!newTestDescription.trim()) {
+      alert('Test description is required');
+      return;
+    }
+
+    const screen = displayScreen || currentScreen || 'DEFAULT';
+    const id = `custom_${screen.toLowerCase()}_${Date.now()}`;
+
+    addTestItem({
+      id,
+      screen,
+      category: newTestCategory,
+      description: newTestDescription.trim(),
+      status: 'not_started',
+    });
+
+    setNewTestDescription('');
+    setNewTestCategory('Functionality');
+    setShowAddTestForm(false);
+  };
+
+  // Remove test
+  const handleRemoveTest = (testId: string) => {
+    if (confirm('Delete this test?')) {
+      removeTestItem(testId);
+    }
   };
 
   // Inline styles for the panel (no Tailwind dependency)
@@ -432,47 +467,92 @@ export function QAPanel() {
       <div style={styles.content}>
         {activeTab === 'tests' && (
           <div style={styles.spaceY}>
-            {currentChecklist ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', ...styles.mb4 }}>
-                  <h3 style={{ ...styles.textWhite, fontWeight: 600, margin: 0 }}>{displayScreen} Tests</h3>
-                  <button
-                    onClick={() => setShowBugForm(!showBugForm)}
-                    style={styles.btnSmall('#dc2626')}
+            {/* Header with action buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', ...styles.mb4 }}>
+              <h3 style={{ ...styles.textWhite, fontWeight: 600, margin: 0 }}>{displayScreen || 'No Screen'} Tests</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => { setShowAddTestForm(!showAddTestForm); setShowBugForm(false); }}
+                  style={styles.btnSmall('#2563eb')}
+                >
+                  {showAddTestForm ? 'Cancel' : '+ Add Test'}
+                </button>
+                <button
+                  onClick={() => { setShowBugForm(!showBugForm); setShowAddTestForm(false); }}
+                  style={styles.btnSmall('#dc2626')}
+                >
+                  {showBugForm ? 'Cancel' : 'Report Bug'}
+                </button>
+              </div>
+            </div>
+
+            {/* Add Test Form */}
+            {showAddTestForm && (
+              <div style={styles.card}>
+                <h4 style={{ ...styles.textWhite, fontWeight: 600, margin: '0 0 12px 0' }}>Add New Test</h4>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={styles.label}>Description *</label>
+                  <input
+                    type="text"
+                    value={newTestDescription}
+                    onChange={(e) => setNewTestDescription(e.target.value)}
+                    placeholder="What should be tested?"
+                    style={styles.input}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddTest()}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={styles.label}>Category</label>
+                  <select
+                    value={newTestCategory}
+                    onChange={(e) => setNewTestCategory(e.target.value as 'UI' | 'Functionality')}
+                    style={styles.select}
                   >
-                    {showBugForm ? 'Cancel Report' : 'Report Bug'}
+                    <option value="UI">UI</option>
+                    <option value="Functionality">Functionality</option>
+                  </select>
+                </div>
+                <div style={styles.flexRow}>
+                  <button onClick={handleAddTest} style={{ ...styles.btn('#2563eb'), ...styles.flex1 }}>
+                    Add Test
+                  </button>
+                  <button onClick={() => setShowAddTestForm(false)} style={{ ...styles.btn('#374151'), ...styles.flex1 }}>
+                    Cancel
                   </button>
                 </div>
+              </div>
+            )}
 
-                {showBugForm && (
-                  <BugReportForm
-                    title={bugTitle}
-                    setTitle={setBugTitle}
-                    description={bugDescription}
-                    setDescription={setBugDescription}
-                    severity={bugSeverity}
-                    setSeverity={setBugSeverity}
-                    expected={bugExpected}
-                    setExpected={setBugExpected}
-                    actual={bugActual}
-                    setActual={setBugActual}
-                    onSubmit={handleSubmitBug}
-                    onCancel={() => setShowBugForm(false)}
-                    styles={styles}
-                  />
-                )}
+            {showBugForm && (
+              <BugReportForm
+                title={bugTitle}
+                setTitle={setBugTitle}
+                description={bugDescription}
+                setDescription={setBugDescription}
+                severity={bugSeverity}
+                setSeverity={setBugSeverity}
+                expected={bugExpected}
+                setExpected={setBugExpected}
+                actual={bugActual}
+                setActual={setBugActual}
+                onSubmit={handleSubmitBug}
+                onCancel={() => setShowBugForm(false)}
+                styles={styles}
+              />
+            )}
 
-                {currentChecklist.items.map((test) => (
-                  <TestItemCard
-                    key={test.id}
-                    test={test}
-                    onUpdateStatus={handleTestStatusUpdate}
-                    styles={styles}
-                  />
-                ))}
-              </>
+            {currentChecklist && currentChecklist.items.length > 0 ? (
+              currentChecklist.items.map((test) => (
+                <TestItemCard
+                  key={test.id}
+                  test={test}
+                  onUpdateStatus={handleTestStatusUpdate}
+                  onRemove={handleRemoveTest}
+                  styles={styles}
+                />
+              ))
             ) : (
-              <p style={styles.textGray}>No tests for this screen</p>
+              <p style={styles.textGray}>No tests for this screen. Click "+ Add Test" to create one.</p>
             )}
           </div>
         )}
@@ -636,10 +716,12 @@ export function QAPanel() {
 function TestItemCard({
   test,
   onUpdateStatus,
+  onRemove,
   styles,
 }: {
   test: TestItem;
   onUpdateStatus: (id: string, status: TestItem['status'], notes?: string) => void;
+  onRemove: (id: string) => void;
   styles: any;
 }) {
   const [showNotes, setShowNotes] = useState(false);
@@ -659,15 +741,24 @@ function TestItemCard({
           <p style={{ ...styles.textWhite, fontSize: '14px', fontWeight: 500, margin: 0 }}>{test.description}</p>
           <p style={{ ...styles.textGray, fontSize: '12px', margin: '4px 0 0 0' }}>{test.category}</p>
         </div>
-        <span style={{
-          padding: '4px 8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: 'white',
-          backgroundColor: statusColors[test.status],
-        }}>
-          {test.status.replace('_', ' ')}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'white',
+            backgroundColor: statusColors[test.status],
+          }}>
+            {test.status.replace('_', ' ')}
+          </span>
+          <button
+            onClick={() => onRemove(test.id)}
+            style={{ ...styles.textRed, background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '0' }}
+            title="Delete test"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div style={{ ...styles.flexRow, marginTop: '8px' }}>

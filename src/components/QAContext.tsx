@@ -67,22 +67,141 @@ const DEFAULT_STATE: QAState = {
   bugs: [],
 };
 
+// Generate a fingerprint of checklists to detect changes
+function generateChecklistFingerprint(checklists: TestChecklist[]): string {
+  const ids = checklists
+    .flatMap(c => c.items.map(i => i.id))
+    .sort()
+    .join(',');
+  return ids;
+}
+
+// Merge saved state with new default checklists, preserving test results
+function mergeChecklists(
+  savedChecklists: TestChecklist[],
+  defaultChecklists: TestChecklist[]
+): TestChecklist[] {
+  // Build a map of saved test results by ID
+  const savedResults = new Map<string, { status: TestItem['status']; notes?: string; testedAt?: number }>();
+  savedChecklists.forEach(checklist => {
+    checklist.items.forEach(item => {
+      if (item.status !== 'not_started' || item.notes || item.testedAt) {
+        savedResults.set(item.id, {
+          status: item.status,
+          notes: item.notes,
+          testedAt: item.testedAt,
+        });
+      }
+    });
+  });
+
+  // Apply saved results to default checklists
+  return defaultChecklists.map(checklist => ({
+    ...checklist,
+    items: checklist.items.map(item => {
+      const saved = savedResults.get(item.id);
+      if (saved) {
+        return { ...item, ...saved };
+      }
+      return item;
+    }),
+  }));
+}
+
+// Try to detect current screen from URL
+function detectScreenFromURL(checklists: TestChecklist[]): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase().replace('#', '');
+  const searchPath = hash || path;
+
+  // Try to match screen names to URL
+  for (const checklist of checklists) {
+    const screenLower = checklist.screen.toLowerCase().replace(/_/g, '-');
+    if (searchPath.includes(screenLower) || searchPath.includes(checklist.screen.toLowerCase())) {
+      return checklist.screen;
+    }
+  }
+
+  // Default to first screen or HOME if on root
+  if (searchPath === '/' || searchPath === '') {
+    const homeScreen = checklists.find(c =>
+      c.screen === 'HOME' || c.screen === 'DASHBOARD' || c.screen === 'MAIN'
+    );
+    return homeScreen?.screen || checklists[0]?.screen || null;
+  }
+
+  return null;
+}
+
 export function QAProvider({
   children,
   defaultChecklists = [],
   storageKey = 'poli_qa_state',
   enableScreenDetection = true,
 }: QAProviderProps) {
-  // Load initial state from localStorage or use default
+  // Load initial state, merging saved state with default checklists
   const [state, setState] = useState<QAState>(() => {
     const loaded = loadQAState(storageKey);
-    if (loaded) {
-      return { ...loaded, isOpen: false }; // Always start closed
+    const fingerprintKey = `${storageKey}_fingerprint`;
+    const savedFingerprint = typeof window !== 'undefined'
+      ? localStorage.getItem(fingerprintKey)
+      : null;
+    const newFingerprint = generateChecklistFingerprint(defaultChecklists);
+
+    // Save the new fingerprint
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(fingerprintKey, newFingerprint);
     }
+
+    if (loaded && loaded.checklists.length > 0) {
+      // If checklists changed, merge them (preserving test results)
+      if (savedFingerprint !== newFingerprint) {
+        const mergedChecklists = mergeChecklists(loaded.checklists, defaultChecklists);
+        return { ...loaded, checklists: mergedChecklists, isOpen: false };
+      }
+      return { ...loaded, isOpen: false };
+    }
+
     return { ...DEFAULT_STATE, checklists: defaultChecklists };
   });
 
-  const [currentScreen, setCurrentScreen] = useState<string | null>(null);
+  // Auto-detect screen from URL
+  const [currentScreen, setCurrentScreenState] = useState<string | null>(() => {
+    if (enableScreenDetection) {
+      return detectScreenFromURL(defaultChecklists);
+    }
+    return null;
+  });
+
+  // Wrapper to allow manual override
+  const setCurrentScreen = useCallback((screen: string | null) => {
+    setCurrentScreenState(screen);
+  }, []);
+
+  // Listen for URL changes to auto-detect screen
+  useEffect(() => {
+    if (!enableScreenDetection) return;
+
+    const handleURLChange = () => {
+      const detected = detectScreenFromURL(state.checklists);
+      if (detected) {
+        setCurrentScreenState(detected);
+      }
+    };
+
+    // Listen for popstate (back/forward navigation)
+    window.addEventListener('popstate', handleURLChange);
+
+    // Listen for hashchange
+    window.addEventListener('hashchange', handleURLChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleURLChange);
+      window.removeEventListener('hashchange', handleURLChange);
+    };
+  }, [enableScreenDetection, state.checklists]);
 
   // Auto-save to localStorage whenever state changes
   useEffect(() => {
