@@ -180,7 +180,7 @@ export function QAProvider({
     setCurrentScreenState(screen);
   }, []);
 
-  // Listen for URL changes to auto-detect screen
+  // Listen for URL changes to auto-detect screen (including programmatic navigation)
   useEffect(() => {
     if (!enableScreenDetection) return;
 
@@ -191,13 +191,32 @@ export function QAProvider({
       }
     };
 
+    // Save original History API methods
+    const originalPushState = history.pushState.bind(history);
+    const originalReplaceState = history.replaceState.bind(history);
+
+    // Override pushState to detect programmatic navigation (e.g., navigate(), router.push())
+    history.pushState = function(state: unknown, unused: string, url?: string | URL | null) {
+      originalPushState(state, unused, url);
+      handleURLChange();
+    };
+
+    // Override replaceState for navigation that replaces history
+    history.replaceState = function(state: unknown, unused: string, url?: string | URL | null) {
+      originalReplaceState(state, unused, url);
+      handleURLChange();
+    };
+
     // Listen for popstate (back/forward navigation)
     window.addEventListener('popstate', handleURLChange);
 
-    // Listen for hashchange
+    // Listen for hashchange (hash-based routing)
     window.addEventListener('hashchange', handleURLChange);
 
     return () => {
+      // Restore original History API methods
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
       window.removeEventListener('popstate', handleURLChange);
       window.removeEventListener('hashchange', handleURLChange);
     };

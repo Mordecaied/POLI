@@ -11,6 +11,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { detectRoutes, routePathToScreenName } from './routerParser';
+import { analyzeComponent, generateSpecificTests } from './jsxParser';
 
 const CHECKLIST_FILENAME = 'poli.checklists.ts';
 
@@ -107,6 +109,24 @@ function extractComponentName(filePath: string): string {
 }
 
 function suggestTestsForComponent(filePath: string, content: string): string[] {
+  const componentName = extractComponentName(filePath);
+
+  // Use JSX parser to analyze actual component content
+  const analysis = analyzeComponent(content);
+
+  // Generate specific tests based on actual UI elements found
+  const specificTests = generateSpecificTests(componentName, analysis);
+
+  // If no specific elements found, fall back to pattern-based tests
+  if (specificTests.length <= 1) {
+    return suggestTestsFromPatterns(filePath, content);
+  }
+
+  return specificTests;
+}
+
+// Fallback: Pattern-based test suggestions (used when JSX parsing finds nothing specific)
+function suggestTestsFromPatterns(filePath: string, content: string): string[] {
   const tests: string[] = [];
   const basename = path.basename(filePath).toLowerCase();
   const contentLower = content.toLowerCase();
@@ -115,7 +135,7 @@ function suggestTestsForComponent(filePath: string, content: string): string[] {
   tests.push('Screen loads without errors');
 
   // Check content for patterns
-  for (const [category, patterns] of Object.entries(TEST_SUGGESTIONS)) {
+  for (const [, patterns] of Object.entries(TEST_SUGGESTIONS)) {
     for (const { pattern, tests: suggestedTests } of patterns) {
       if (pattern.test(basename) || pattern.test(contentLower)) {
         tests.push(...suggestedTests);
@@ -146,12 +166,40 @@ function suggestTestsForComponent(filePath: string, content: string): string[] {
 
 function detectScreens(projectRoot: string): DetectedScreen[] {
   const screens: DetectedScreen[] = [];
-  const srcDir = path.join(projectRoot, 'src');
+  const seenScreenNames = new Set<string>();
 
-  if (!fs.existsSync(srcDir)) {
-    console.log('No src/ directory found. Scanning from project root...');
+  // STEP 1: Try to detect routes from router configuration
+  const routerResult = detectRoutes(projectRoot);
+
+  if (routerResult.type !== 'none' && routerResult.routes.length > 0) {
+    console.log(`  📍 Found router config in ${routerResult.configFile} (${routerResult.type})`);
+
+    for (const route of routerResult.routes) {
+      const screenName = routePathToScreenName(route.path);
+
+      if (!seenScreenNames.has(screenName)) {
+        seenScreenNames.add(screenName);
+
+        // Try to find and analyze the component file
+        let suggestedTests = ['Screen loads without errors'];
+        const componentFile = findComponentFile(projectRoot, route.componentName);
+
+        if (componentFile) {
+          const content = fs.readFileSync(componentFile, 'utf-8');
+          suggestedTests = suggestTestsForComponent(componentFile, content);
+        }
+
+        screens.push({
+          name: screenName,
+          filePath: route.filePath || componentFile || route.componentName,
+          suggestedTests,
+        });
+      }
+    }
   }
 
+  // STEP 2: Also scan for additional screens using file patterns
+  const srcDir = path.join(projectRoot, 'src');
   const searchDir = fs.existsSync(srcDir) ? srcDir : projectRoot;
   const allFiles = getAllFiles(searchDir);
 
@@ -164,8 +212,15 @@ function detectScreens(projectRoot: string): DetectedScreen[] {
     const isScreen = SCREEN_PATTERNS.some(p => p.test(normalizedPath));
 
     if (isScreen) {
-      const content = fs.readFileSync(filePath, 'utf-8');
       const name = extractComponentName(filePath);
+
+      // Skip if already detected from router
+      if (seenScreenNames.has(name)) {
+        continue;
+      }
+      seenScreenNames.add(name);
+
+      const content = fs.readFileSync(filePath, 'utf-8');
       const suggestedTests = suggestTestsForComponent(filePath, content);
 
       screens.push({
@@ -177,6 +232,46 @@ function detectScreens(projectRoot: string): DetectedScreen[] {
   }
 
   return screens;
+}
+
+// Helper to find a component file by name
+function findComponentFile(projectRoot: string, componentName: string): string | null {
+  const srcDir = path.join(projectRoot, 'src');
+  const searchDir = fs.existsSync(srcDir) ? srcDir : projectRoot;
+
+  // Common file patterns for a component
+  const possiblePaths = [
+    `${componentName}.tsx`,
+    `${componentName}.jsx`,
+    `${componentName}/index.tsx`,
+    `${componentName}/index.jsx`,
+    `components/${componentName}.tsx`,
+    `components/${componentName}.jsx`,
+    `pages/${componentName}.tsx`,
+    `pages/${componentName}.jsx`,
+    `screens/${componentName}.tsx`,
+    `screens/${componentName}.jsx`,
+    `views/${componentName}.tsx`,
+    `views/${componentName}.jsx`,
+  ];
+
+  for (const relativePath of possiblePaths) {
+    const fullPath = path.join(searchDir, relativePath);
+    if (fs.existsSync(fullPath)) {
+      return fullPath;
+    }
+  }
+
+  // Search recursively for the component
+  const allFiles = getAllFiles(searchDir);
+  for (const file of allFiles) {
+    const basename = path.basename(file, path.extname(file));
+    if (basename === componentName || basename === `${componentName}Page` || basename === `${componentName}Screen`) {
+      return file;
+    }
+  }
+
+  return null;
 }
 
 function generateChecklistFile(screens: DetectedScreen[]): string {
@@ -242,13 +337,15 @@ function main() {
   switch (command) {
     case 'init': {
       console.log('Scanning project for screens...\n');
+      console.log('  🔍 Looking for router configurations...');
 
       const screens = detectScreens(projectRoot);
 
       if (screens.length === 0) {
-        console.log('No screens detected. Make sure your screen components follow naming conventions:');
-        console.log('  - *Page.tsx, *Screen.tsx, *View.tsx');
-        console.log('  - Or are in pages/, screens/, views/, routes/ directories');
+        console.log('\nNo screens detected. POLI looks for:');
+        console.log('  1. Router configurations (createBrowserRouter, <Routes>, Next.js pages)');
+        console.log('  2. File naming patterns (*Page.tsx, *Screen.tsx, *View.tsx)');
+        console.log('  3. Directory conventions (pages/, screens/, views/, routes/)');
         console.log('\nYou can manually create a checklist file or use: npx poli-qa add <ScreenName>');
         return;
       }
@@ -289,11 +386,12 @@ function main() {
 
     case 'scan': {
       console.log('Scanning project for screens...\n');
+      console.log('  🔍 Looking for router configurations...');
 
       const screens = detectScreens(projectRoot);
 
       if (screens.length === 0) {
-        console.log('No screens detected.');
+        console.log('\nNo screens detected.');
         return;
       }
 
