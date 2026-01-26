@@ -1,6 +1,6 @@
 {
   "name": "poli-qa",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "POLI - Portable Overlay for Live Inspection. A QA testing overlay for React apps with CLI auto-detection.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
